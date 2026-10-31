@@ -21,7 +21,7 @@ import {
 import { createPoller, writeMarker, type Poller, type PollerEngine } from './poller';
 import { coachOf, statusLine, type CoachActions, type LightId } from './views/coach';
 import { desktopViewBar, renderDesktopOverview, type DesktopElements } from './views/desktop';
-import { monospace } from './views/frame';
+import { monospace, setBoxedFrames } from './views/frame';
 import { renderView } from './views/index';
 import { badgesLine, header, type OverviewActions } from './views/overview';
 
@@ -852,6 +852,7 @@ export const register: Register = (on) => {
     noteRender($, e, now);
     const { Box, Text } = $.ui.resolve(e);
     try {
+      setBoxedFrames(e.surface !== 'terminal');
       const tree = e.surface === 'terminal' ? buildPane($, e, now) : buildDesktopPane($, e, now);
       model = { ...model, lastTree: tree };
       return tree;

@@ -10,9 +10,17 @@
 // Button's hotkey with), `success` / `warning` / `error` the three bands,
 // and the borders are dimmed default text like the engine's own frames.
 import type { ElementTable, RenderElement, RenderNode } from 'claude-code';
+import type { DesktopElements } from './desktop';
 import type { Color, ViewElements } from './overview';
 
 export const ACCENT = 'suggestion';
+
+// Whether this drawing is for a surface that sets text in a proportional
+// face: the pane sets it before each render, and a frame draws a real box.
+let boxedFrames = false;
+export function setBoxedFrames(on: boolean): void {
+  boxedFrames = on;
+}
 export const OK = 'success';
 export const WARN = 'warning';
 export const CRIT = 'error';
@@ -173,6 +181,7 @@ export function innerWidth(frameWidth: number): number {
  * `│ ` and ` │`, `╰────╯`. Every line is exactly `width` columns.
  */
 export function frame(f: Frame, el: FrameElements): RenderElement {
+  if (boxedFrames) return boxedFrame(f, el);
   const { Box, Button } = el;
   const w = Math.max(4, f.width);
   const border: Omit<Seg, 'text'> = f.focused ? { color: ACCENT } : { dim: true };
@@ -210,6 +219,43 @@ export function frame(f: Frame, el: FrameElements): RenderElement {
   );
 }
 
+// The same panel as a bordered Box: the title in the text face, the rows in
+// the mono face the cells were padded for (the pane's monospace pass).
+function boxedFrame(f: Frame, el: FrameElements): RenderElement {
+  const { Box, Button } = el;
+  const Text = el.Text as unknown as DesktopElements['Text'];
+  const inner = innerWidth(Math.max(4, f.width));
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={f.focused ? ACCENT : undefined}
+      borderDimColor={f.focused !== true}
+      paddingX={1}
+      marginBottom={1}
+    >
+      <Box flexDirection="row" columnGap={1} paddingBottom={1}>
+        <Text weight="semibold" mono={false}>
+          {f.title}
+        </Text>
+        {f.summary !== undefined && f.summary !== '' && (
+          <Box flexShrink={1} minWidth={0}>
+            <Text dimColor mono={false} wrap="truncate-end">
+              {f.summary}
+            </Text>
+          </Box>
+        )}
+      </Box>
+      {f.rows.map((r) => {
+        const cells = fit(r.line, inner);
+        if (r.press === undefined || Button === undefined) return textRow(cells, el, r.key);
+        const press = r.press;
+        return <Button key={press.key} label={cells.map((x) => x.text).join('').trimEnd()} plain dimColor onPress={press.onPress} />;
+      })}
+    </Box>
+  );
+}
+
 /** Frames side by side on one row; each keeps its own width. */
 export function sideBySide(frames: RenderElement[], el: ViewElements): RenderElement {
   const { Box } = el;
@@ -229,6 +275,6 @@ export function split(columns: number): [number, number] {
 export function monospace(node: RenderNode): RenderNode {
   if (typeof node === 'string' || (node.type !== 'Box' && node.type !== 'Text')) return node;
   const children = node.children?.map(monospace);
-  const props = node.type === 'Text' ? { ...node.props, mono: true } : node.props;
+  const props = node.type === 'Text' ? { ...node.props, mono: node.props?.mono ?? true } : node.props;
   return { ...node, ...(props === undefined ? {} : { props }), ...(children === undefined ? {} : { children }) };
 }
