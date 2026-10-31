@@ -9,7 +9,7 @@
 // the person's theme: `suggestion` is the accent (what the engine colours a
 // Button's hotkey with), `success` / `warning` / `error` the three bands,
 // and the borders are dimmed default text like the engine's own frames.
-import type { ElementTable, RenderElement } from 'claude-code';
+import type { ElementTable, RenderElement, RenderNode } from 'claude-code';
 import type { Color, ViewElements } from './overview';
 
 export const ACCENT = 'suggestion';
@@ -220,4 +220,15 @@ export function sideBySide(frames: RenderElement[], el: ViewElements): RenderEle
 export function split(columns: number): [number, number] {
   const left = Math.floor(columns / 2);
   return [left, columns - left];
+}
+
+/**
+ * The tree with every Text in the surface's monospaced face. The pane lays
+ * out in cells, so a proportional face (the desktop's) breaks every border.
+ */
+export function monospace(node: RenderNode): RenderNode {
+  if (typeof node === 'string' || (node.type !== 'Box' && node.type !== 'Text')) return node;
+  const children = node.children?.map(monospace);
+  const props = node.type === 'Text' ? { ...node.props, mono: true } : node.props;
+  return { ...node, ...(props === undefined ? {} : { props }), ...(children === undefined ? {} : { children }) };
 }

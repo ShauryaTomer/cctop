@@ -20,6 +20,8 @@ import {
 } from './model';
 import { createPoller, writeMarker, type Poller, type PollerEngine } from './poller';
 import { coachOf, statusLine, type CoachActions, type LightId } from './views/coach';
+import { desktopViewBar, renderDesktopOverview, type DesktopElements } from './views/desktop';
+import { monospace } from './views/frame';
 import { renderView } from './views/index';
 import { badgesLine, header, type OverviewActions } from './views/overview';
 
@@ -597,6 +599,25 @@ function buildPane($: EngineInterface, e: RenderInput<'Pane'>, now: number): Ren
   );
 }
 
+// A surface that sets text in a proportional face: its own tab bar and
+// Overview; the views not yet laid out for it keep the cell layout, set mono.
+function buildDesktopPane($: EngineInterface, e: RenderInput<'Pane'>, now: number): RenderElement {
+  if (e.props.placement === 'inline') return monospace(buildPane($, e, now)) as RenderElement;
+  const el = $.ui.resolve(e) as unknown as DesktopElements;
+  const { Box, Text } = el;
+  const overview = model.view === 'overview' ? renderDesktopOverview(model, el, overviewActions($)) : null;
+  const view =
+    overview ?? (monospace(renderView(model, el, e.props.bodyColumns, 'dock', now, { el, coach: coachActions($), overview: overviewActions($), agents: agentsActions($) })) as RenderElement);
+  return (
+    <Box flexDirection="column" paddingX={1} paddingTop={1}>
+      {desktopViewBar(VIEWS, model.view, (v) => selectView($, v as View), el)}
+      {view}
+      {model.binary === 'missing' && <Text wrap="truncate">{INSTALL_HINT}</Text>}
+      {model.stale && <Text dimColor>cctop query stale</Text>}
+    </Box>
+  );
+}
+
 // The view bar, the pane's first row: `cctop  Overview  Tools  …`. The
 // current view is an inverse Text; the others are plain Buttons (a click,
 // or Enter after `ctrl+x tab` and `tab`, switches). No hotkeys: the docked
@@ -831,7 +852,7 @@ export const register: Register = (on) => {
     noteRender($, e, now);
     const { Box, Text } = $.ui.resolve(e);
     try {
-      const tree = buildPane($, e, now);
+      const tree = e.surface === 'terminal' ? buildPane($, e, now) : buildDesktopPane($, e, now);
       model = { ...model, lastTree: tree };
       return tree;
     } catch (err) {
